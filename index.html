@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:,">
 <title>Pickleball — Find a Time</title>
 <style>
 :root{--bg:#f4f7f2;--card:#fff;--ink:#172018;--muted:#6b756d;--line:#dce4dc;--green:#4f9164;--green2:#e5f2e8;--red:#d75b5b;--red2:#ffe8e8}
@@ -71,23 +72,13 @@ button{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:poin
 <button class="danger" onclick="leave()">Leave my name</button>
 </div>
 <div id="status" class="status"></div>
-<div class="notice">For GitHub Pages: this page connects to Firebase Realtime Database. You only need to paste your Firebase configuration into the marked section near the bottom of this file and create the database once.</div>
 </section>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-import { getDatabase, ref, onValue, set, update, remove } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
+import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
 
-/* ==========================================================
-   PASTE YOUR FIREBASE WEB APP CONFIG HERE.
-   Firebase Console -> Project settings -> Your apps -> Web app
-   ========================================================== */
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyABoAUCiNCqKChLq4L3X7GS_GFIbJifmdE",
   authDomain: "pickle-9f1d2.firebaseapp.com",
@@ -99,10 +90,6 @@ const firebaseConfig = {
   measurementId: "G-072K1ENKSK"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
-
 const configured = !Object.values(firebaseConfig).some(v => v.includes("PASTE_"));
 const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], START=9, END=22;
 const params=new URLSearchParams(location.search);
@@ -110,38 +97,29 @@ let room=params.get("room") || "pickleball";
 let state={people:[],busy:{}};
 let db=null, roomRef=null;
 
-if(configured){
-  const app=initializeApp(firebaseConfig); db=getDatabase(app); roomRef=ref(db,"rooms/"+room);
-  onValue(roomRef,s=>{state=s.val()||{people:[],busy:{}};state.people=state.people||[];state.busy=state.busy||{};render()});
-}else{
-  document.getElementById("status").innerHTML='<span class="offline">Firebase not configured yet.</span> Add the config above before publishing.';
-  render();
-}
-
+/* Define all handlers first so buttons always work, even if Firebase fails to load */
 window.join=async()=>{
   const input=document.getElementById("name"), name=input.value.trim();
   if(!name)return;
   if(!state.people.includes(name)) state.people.push(name);
   state.busy[name]=state.busy[name]||{};
-  await write(); input.value=""; document.getElementById("person").value=name; render();
+  await write(); input.value=""; render(); document.getElementById("person").value=name; render();
 };
 window.toggle=async(d,h)=>{
   const p=document.getElementById("person").value;if(!p)return;
   const k=d+"-"+h, b=state.busy[p]||{};
   if(b[k]) delete b[k]; else b[k]=true;
-  state.busy[p]=b; await write();
+  state.busy[p]=b; render(); await write();
 };
 window.clearBusy=async()=>{
   const p=document.getElementById("person").value;if(!p)return;
-  state.busy[p]={}; await write();
+  state.busy[p]={}; render(); await write();
 };
 window.leave=async()=>{
   const p=document.getElementById("person").value;if(!p)return;
   if(!confirm("Remove "+p+" from this group?"))return;
-  state.people=state.people.filter(x=>x!==p);delete state.busy[p];await write();
+  state.people=state.people.filter(x=>x!==p);delete state.busy[p];render();await write();
 };
-async function write(){if(!configured)return;await set(roomRef,state);setStatus("Saved ✓");}
-function setStatus(x){document.getElementById("status").textContent=x;setTimeout(()=>{if(configured)document.getElementById("status").innerHTML='<span class="online">● Live</span> — changes sync automatically';},1200)}
 window.copyRoom=async()=>{
   const url=location.href.split("?")[0]+"?room="+encodeURIComponent(room);
   await navigator.clipboard.writeText(url);setStatus("Room link copied ✓");
@@ -151,19 +129,33 @@ window.copySummary=async()=>{
   for(let d=0;d<7;d++){let a=[];for(let h=START;h<END;h++)if(state.people.length&&state.people.every(p=>!((state.busy[p]||{})[d+"-"+h])))a.push(fmt(h)+"–"+fmt(h+1));if(a.length)s+=DAYS[d]+": "+a.join(", ")+"\n";}
   await navigator.clipboard.writeText(s);setStatus("Availability copied ✓");
 };
+
+async function write(){
+  if(!configured)return;
+  try{await set(roomRef,state);setStatus("Saved ✓");}
+  catch(e){console.error(e);document.getElementById("status").innerHTML='<span class="offline">Could not save.</span> Check your Firebase database rules.';}
+}
+function setStatus(x){
+  document.getElementById("status").textContent=x;
+  setTimeout(()=>{if(configured)document.getElementById("status").innerHTML='<span class="online">● Live</span> — changes sync automatically';},1200);
+}
 function render(){
   const ppl=document.getElementById("people"),sel=document.getElementById("person"),old=sel.value;
   ppl.innerHTML=state.people.length?state.people.map(p=>`<span class="person"><i class="dot"></i>${esc(p)}</span>`).join(""):"<span class='hint'>No one has joined yet.</span>";
-  sel.innerHTML=state.people.map(p=>`<option>${esc(p)}</option>`).join("");if(state.people.includes(old))sel.value=old;
-  if(configured)document.getElementById("status").innerHTML='<span class="online">● Live</span> — changes sync automatically';
+  sel.innerHTML=state.people.map(p=>`<option>${esc(p)}</option>`).join("");
+  if(state.people.includes(old))sel.value=old;
   renderCalendar();renderResults();
 }
 function renderCalendar(){
   const p=document.getElementById("person").value,cal=document.getElementById("calendar");
   cal.innerHTML=DAYS.map((d,di)=>{
     let s=`<div class="day"><div class="dayhead">${d}<br><span class="date">${dateLabel(di)}</span></div>`;
-    for(let h=START;h<END;h++){const k=di+"-"+h,busy=!!((state.busy[p]||{})[k]),free=state.people.length&&state.people.every(x=>!((state.busy[x]||{})[k])),partial=state.people.some(x=>((state.busy[x]||{})[k]));
-      s+=`<div class="slot ${busy?'busy':free?'allfree':partial?'partial':''}" onclick="toggle(${di},${h})">${fmt(h)}</div>`}
+    for(let h=START;h<END;h++){
+      const k=di+"-"+h,busy=!!((state.busy[p]||{})[k]),
+        free=state.people.length&&state.people.every(x=>!((state.busy[x]||{})[k])),
+        partial=state.people.some(x=>((state.busy[x]||{})[k]));
+      s+=`<div class="slot ${busy?'busy':free?'allfree':partial?'partial':''}" onclick="toggle(${di},${h})">${fmt(h)}</div>`;
+    }
     return s+"</div>";
   }).join("");
 }
@@ -178,6 +170,25 @@ function renderResults(){
 function dateLabel(di){const n=new Date(),today=(n.getDay()+6)%7,d=new Date(n);d.setDate(n.getDate()+di-today);return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
 function fmt(h){return (h%12||12)+(h>=12?" PM":" AM")}
 function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+
+/* Start Firebase (single initialization, no analytics) */
+if(configured){
+  const app=initializeApp(firebaseConfig);
+  db=getDatabase(app);
+  roomRef=ref(db,"rooms/"+encodeURIComponent(room));
+  onValue(roomRef,s=>{
+    state=s.val()||{people:[],busy:{}};
+    state.people=state.people||[];
+    state.busy=state.busy||{};
+    document.getElementById("status").innerHTML='<span class="online">● Live</span> — changes sync automatically';
+    render();
+  },err=>{
+    console.error(err);
+    document.getElementById("status").innerHTML='<span class="offline">Cannot connect.</span> Check your Firebase database rules.';
+  });
+}else{
+  document.getElementById("status").innerHTML='<span class="offline">Firebase not configured yet.</span>';
+}
 render();
 </script>
 </body>
