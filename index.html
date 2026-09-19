@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pickleball — Find a Time</title>
+<style>
+:root{--bg:#f4f7f2;--card:#fff;--ink:#172018;--muted:#6b756d;--line:#dce4dc;--green:#4f9164;--green2:#e5f2e8;--red:#d75b5b;--red2:#ffe8e8}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#f5f8f3,#eaf2eb);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink)}
+.wrap{max-width:1080px;margin:auto;padding:30px 18px 60px}.hero{margin-bottom:22px}.badge{display:inline-block;background:var(--green2);color:#39714c;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;letter-spacing:.3px}
+h1{font-size:clamp(35px,6vw,60px);letter-spacing:-2.5px;line-height:1;margin:13px 0 9px}.sub{color:var(--muted);font-size:16px;max-width:650px}
+.card{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:22px;padding:22px;margin:15px 0;box-shadow:0 12px 35px rgba(31,61,39,.07)}
+.title{font-size:18px;font-weight:850}.hint{color:var(--muted);font-size:13px;margin:5px 0 16px}
+.row{display:flex;gap:10px;flex-wrap:wrap}.input,select{border:1px solid var(--line);background:#fbfcfb;border-radius:12px;padding:13px 14px;font-size:15px;outline:none;min-width:200px;flex:1}
+button{border:0;border-radius:12px;padding:13px 16px;font-weight:800;cursor:pointer}.primary{background:var(--green);color:#fff}.secondary{background:#edf1ed;color:#26332a}.danger{background:#fff0f0;color:#a44141}
+.people{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}.person{background:#f0f4f0;border-radius:999px;padding:7px 11px;font-size:13px}.dot{display:inline-block;width:8px;height:8px;background:var(--green);border-radius:50%;margin-right:6px}
+.grid{display:grid;grid-template-columns:repeat(7,1fr);gap:9px;overflow-x:auto}.day{min-width:105px}.dayhead{font-size:13px;font-weight:850;margin-bottom:7px}.date{color:var(--muted);font-weight:500}
+.slot{height:41px;border:1px solid var(--line);background:#fafcfa;border-radius:9px;margin:5px 0;display:flex;align-items:center;justify-content:center;font-size:11px;cursor:pointer;user-select:none}.slot.busy{background:var(--red2);border-color:#efb4b4;color:#a34848}.slot.allfree{background:#e6f4e9;border-color:#b9ddc2;color:#376f48}.slot.partial{background:#fff8e2;border-color:#ead79d;color:#80671f}
+.legend{display:flex;gap:14px;flex-wrap:wrap;color:var(--muted);font-size:12px;margin:12px 0}.key{display:flex;align-items:center;gap:5px}.sw{width:13px;height:13px;border-radius:4px;background:#fafcfa;border:1px solid var(--line)}.sw.red{background:var(--red2);border-color:#efb4b4}.sw.green{background:#e6f4e9;border-color:#b9ddc2}.sw.yellow{background:#fff8e2;border-color:#ead79d}
+.results{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}.result{background:#f3faf4;border:1px solid #cde2d1;border-radius:15px;padding:15px}.result strong{font-size:15px}.result small{display:block;color:var(--muted);margin-top:4px}.count{display:inline-block;margin-top:9px;background:#dcefe0;color:#386d46;padding:5px 8px;border-radius:999px;font-size:11px;font-weight:850}
+.notice{padding:12px 14px;border-radius:12px;background:#f7f9f7;color:var(--muted);font-size:12px}.status{font-size:12px;color:var(--muted);margin-top:9px;min-height:16px}.online{color:#3c8150;font-weight:800}.offline{color:#a45b38;font-weight:800}
+.empty{text-align:center;color:var(--muted);padding:20px;border:1px dashed var(--line);border-radius:14px}
+@media(max-width:700px){.grid{grid-template-columns:repeat(7,105px)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="hero">
+<div class="badge">🏓 PICKLEBALL PLANNER</div>
+<h1>Find a time.<br>Stop texting.</h1>
+<div class="sub">Everyone marks when they're busy. The schedule updates live for the whole group.</div>
+</header>
+
+<section class="card">
+<div class="title">1. Join the group</div>
+<div class="hint">Pick a name so your availability is saved separately.</div>
+<div class="row">
+<input id="name" class="input" maxlength="24" placeholder="Your name">
+<button class="primary" onclick="join()">Join / Save name</button>
+</div>
+<div id="people" class="people"></div>
+</section>
+
+<section class="card">
+<div class="title">2. Mark when you're busy</div>
+<div class="hint">Select yourself, then tap every hour you <b>can't</b> play. Leave free times alone.</div>
+<div class="row">
+<select id="person" onchange="render()"></select>
+<button class="secondary" onclick="clearBusy()">Clear my times</button>
+</div>
+<div class="legend">
+<span class="key"><i class="sw red"></i> You're busy</span>
+<span class="key"><i class="sw green"></i> Everyone free</span>
+<span class="key"><i class="sw yellow"></i> Some people busy</span>
+</div>
+<div id="calendar" class="grid"></div>
+</section>
+
+<section class="card">
+<div class="title">🎯 Times everyone can play</div>
+<div class="hint">These are the slots where nobody has marked themselves busy.</div>
+<div id="results"></div>
+</section>
+
+<section class="card">
+<div class="title">Share this game</div>
+<div class="hint">The room is identified by the link. Everyone who opens the same link sees the same live schedule.</div>
+<div class="row">
+<button class="primary" onclick="copyRoom()">Copy room link</button>
+<button class="secondary" onclick="copySummary()">Copy availability</button>
+<button class="danger" onclick="leave()">Leave my name</button>
+</div>
+<div id="status" class="status"></div>
+<div class="notice">For GitHub Pages: this page connects to Firebase Realtime Database. You only need to paste your Firebase configuration into the marked section near the bottom of this file and create the database once.</div>
+</section>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getDatabase, ref, onValue, set, update, remove } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
+
+/* ==========================================================
+   PASTE YOUR FIREBASE WEB APP CONFIG HERE.
+   Firebase Console -> Project settings -> Your apps -> Web app
+   ========================================================== */
+const firebaseConfig = {
+  apiKey: "PASTE_API_KEY",
+  authDomain: "PASTE_PROJECT.firebaseapp.com",
+  databaseURL: "https://PASTE_PROJECT-default-rtdb.firebaseio.com",
+  projectId: "PASTE_PROJECT",
+  storageBucket: "PASTE_PROJECT.firebasestorage.app",
+  messagingSenderId: "PASTE_MESSAGING_SENDER_ID",
+  appId: "PASTE_APP_ID"
+};
+
+const configured = !Object.values(firebaseConfig).some(v => v.includes("PASTE_"));
+const DAYS=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], START=9, END=22;
+const params=new URLSearchParams(location.search);
+let room=params.get("room") || "pickleball";
+let state={people:[],busy:{}};
+let db=null, roomRef=null;
+
+if(configured){
+  const app=initializeApp(firebaseConfig); db=getDatabase(app); roomRef=ref(db,"rooms/"+room);
+  onValue(roomRef,s=>{state=s.val()||{people:[],busy:{}};state.people=state.people||[];state.busy=state.busy||{};render()});
+}else{
+  document.getElementById("status").innerHTML='<span class="offline">Firebase not configured yet.</span> Add the config above before publishing.';
+  render();
+}
+
+window.join=async()=>{
+  const input=document.getElementById("name"), name=input.value.trim();
+  if(!name)return;
+  if(!state.people.includes(name)) state.people.push(name);
+  state.busy[name]=state.busy[name]||{};
+  await write(); input.value=""; document.getElementById("person").value=name; render();
+};
+window.toggle=async(d,h)=>{
+  const p=document.getElementById("person").value;if(!p)return;
+  const k=d+"-"+h, b=state.busy[p]||{};
+  if(b[k]) delete b[k]; else b[k]=true;
+  state.busy[p]=b; await write();
+};
+window.clearBusy=async()=>{
+  const p=document.getElementById("person").value;if(!p)return;
+  state.busy[p]={}; await write();
+};
+window.leave=async()=>{
+  const p=document.getElementById("person").value;if(!p)return;
+  if(!confirm("Remove "+p+" from this group?"))return;
+  state.people=state.people.filter(x=>x!==p);delete state.busy[p];await write();
+};
+async function write(){if(!configured)return;await set(roomRef,state);setStatus("Saved ✓");}
+function setStatus(x){document.getElementById("status").textContent=x;setTimeout(()=>{if(configured)document.getElementById("status").innerHTML='<span class="online">● Live</span> — changes sync automatically';},1200)}
+window.copyRoom=async()=>{
+  const url=location.href.split("?")[0]+"?room="+encodeURIComponent(room);
+  await navigator.clipboard.writeText(url);setStatus("Room link copied ✓");
+};
+window.copySummary=async()=>{
+  let s="🏓 Pickleball — times everyone can play\n\n";
+  for(let d=0;d<7;d++){let a=[];for(let h=START;h<END;h++)if(state.people.length&&state.people.every(p=>!((state.busy[p]||{})[d+"-"+h])))a.push(fmt(h)+"–"+fmt(h+1));if(a.length)s+=DAYS[d]+": "+a.join(", ")+"\n";}
+  await navigator.clipboard.writeText(s);setStatus("Availability copied ✓");
+};
+function render(){
+  const ppl=document.getElementById("people"),sel=document.getElementById("person"),old=sel.value;
+  ppl.innerHTML=state.people.length?state.people.map(p=>`<span class="person"><i class="dot"></i>${esc(p)}</span>`).join(""):"<span class='hint'>No one has joined yet.</span>";
+  sel.innerHTML=state.people.map(p=>`<option>${esc(p)}</option>`).join("");if(state.people.includes(old))sel.value=old;
+  if(configured)document.getElementById("status").innerHTML='<span class="online">● Live</span> — changes sync automatically';
+  renderCalendar();renderResults();
+}
+function renderCalendar(){
+  const p=document.getElementById("person").value,cal=document.getElementById("calendar");
+  cal.innerHTML=DAYS.map((d,di)=>{
+    let s=`<div class="day"><div class="dayhead">${d}<br><span class="date">${dateLabel(di)}</span></div>`;
+    for(let h=START;h<END;h++){const k=di+"-"+h,busy=!!((state.busy[p]||{})[k]),free=state.people.length&&state.people.every(x=>!((state.busy[x]||{})[k])),partial=state.people.some(x=>((state.busy[x]||{})[k]));
+      s+=`<div class="slot ${busy?'busy':free?'allfree':partial?'partial':''}" onclick="toggle(${di},${h})">${fmt(h)}</div>`}
+    return s+"</div>";
+  }).join("");
+}
+function renderResults(){
+  const el=document.getElementById("results");
+  if(!state.people.length){el.innerHTML='<div class="empty">Add your group members above.</div>';return}
+  let out=[];
+  for(let d=0;d<7;d++)for(let h=START;h<END;h++)if(state.people.every(p=>!((state.busy[p]||{})[d+"-"+h])))out.push({d,h});
+  if(!out.length){el.innerHTML='<div class="empty">No completely open hours yet.</div>';return}
+  el.innerHTML='<div class="results">'+out.map(x=>`<div class="result"><strong>${DAYS[x.d]} · ${fmt(x.h)}–${fmt(x.h+1)}</strong><small>${dateLabel(x.d)}</small><span class="count">✓ ${state.people.length}/${state.people.length} free</span></div>`).join("")+'</div>';
+}
+function dateLabel(di){const n=new Date(),today=(n.getDay()+6)%7,d=new Date(n);d.setDate(n.getDate()+di-today);return d.toLocaleDateString(undefined,{month:"short",day:"numeric"})}
+function fmt(h){return (h%12||12)+(h>=12?" PM":" AM")}
+function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+render();
+</script>
+</body>
+</html>
